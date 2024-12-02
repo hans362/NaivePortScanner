@@ -1,4 +1,3 @@
-import asyncio
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox
@@ -8,6 +7,7 @@ import utils
 
 total_tasks = 0
 finished_tasks = 0
+pool = None
 
 
 def detect_hosts_callback(result):
@@ -24,7 +24,7 @@ def detect_hosts_callback(result):
 
 
 def detect_hosts():
-    global total_tasks, finished_tasks
+    global total_tasks, finished_tasks, pool
     cidr = cidr_entry.get()
     if not cidr:
         messagebox.showwarning("错误", "请输入有效的 CIDR")
@@ -33,12 +33,21 @@ def detect_hosts():
     if len(ips) == 0:
         messagebox.showwarning("错误", "请输入有效的 CIDR")
         return
+    detect_type = detect_method.get()
+    if detect_type == "ICMP Echo 探测":
+        detect_function = utils.IcmpEchoScan
+    elif detect_type == "ARP 探测":
+        detect_function = utils.ArpScan
+    else:
+        messagebox.showwarning("错误", "请选择有效的探测方法")
+        return
     detect_button["state"] = "disabled"
     scan_button["state"] = "disabled"
     total_tasks = len(ips)
     finished_tasks = 0
+    progressbar["value"] = 0
     tree.delete(*tree.get_children())
-    utils.ParallelIcmpEchoScan(ips, detect_hosts_callback)
+    pool = utils.ParallelHostScan(ips, detect_hosts_callback, detect_function)
 
 
 def scan_callback(result):
@@ -81,7 +90,7 @@ def scan_callback(result):
 
 
 def scan_ports():
-    global total_tasks, finished_tasks
+    global total_tasks, finished_tasks, pool
     ips = [tree.item(record)["text"] for record in tree.get_children()]
     if len(ips) == 0:
         messagebox.showwarning("错误", "请先进行主机探测")
@@ -96,7 +105,7 @@ def scan_ports():
         except ValueError:
             messagebox.showwarning("输入错误", "请输入有效的端口范围")
             return
-    scan_type = tcp_scan_method.get()
+    scan_type = scan_method.get()
     if scan_type == "TCP Connect 扫描":
         scan_function = utils.TcpConnectScan
     elif scan_type == "TCP SYN 扫描":
@@ -118,7 +127,8 @@ def scan_ports():
         tree.insert(record, "end", text="Closed/Filtered")
     total_tasks = len(ips) * len(ports)
     finished_tasks = 0
-    utils.ParallelPortScan(ips, ports, scan_callback, scan_function)
+    progressbar["value"] = 0
+    pool = utils.ParallelPortScan(ips, ports, scan_callback, scan_function)
 
 
 root = ttk.Window(themename="superhero")
@@ -152,16 +162,16 @@ settings = ttk.Frame(root)
 settings.grid(row=3, column=0, columnspan=3, padx=0, pady=0, sticky="ew")
 
 detect_method = ttk.Combobox(settings)
-detect_method["values"] = ("ICMP Echo 探测",)
+detect_method["values"] = ("ICMP Echo 探测", "ARP 探测")
 detect_method["state"] = "readonly"
 detect_method.current(0)
 detect_method.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-tcp_scan_method = ttk.Combobox(settings)
-tcp_scan_method["values"] = ("TCP Connect 扫描", "TCP SYN 扫描", "TCP FIN 扫描")
-tcp_scan_method["state"] = "readonly"
-tcp_scan_method.current(0)
-tcp_scan_method.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+scan_method = ttk.Combobox(settings)
+scan_method["values"] = ("TCP Connect 扫描", "TCP SYN 扫描", "TCP FIN 扫描")
+scan_method["state"] = "readonly"
+scan_method.current(0)
+scan_method.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
 export_button = ttk.Button(settings, text="导出结果")
 export_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
@@ -177,3 +187,6 @@ root.grid_rowconfigure(2, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
 root.mainloop()
+if pool:
+    pool.terminate()
+    pool.join()

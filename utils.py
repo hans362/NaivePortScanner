@@ -1,4 +1,4 @@
-from scapy.all import TCP, IP, sr1, RandShort, ICMP
+from scapy.all import TCP, IP, sr1, RandShort, ICMP, ARP
 from multiprocessing.pool import ThreadPool
 import consts
 import socket
@@ -23,11 +23,19 @@ def IcmpEchoScan(ip):
     return ip, consts.HOST_DOWN
 
 
-def ParallelIcmpEchoScan(ips, callback):
+def ArpScan(ip):
+    response = sr1(ARP(pdst=ip), timeout=consts.SCAN_TIMEOUT, verbose=False)
+    if response:
+        return ip, consts.HOST_UP
+    return ip, consts.HOST_DOWN
+
+
+def ParallelHostScan(ips, callback, scan_type=IcmpEchoScan):
     pool = ThreadPool(os.cpu_count() * 4 + 1)
     for ip in ips:
         pool.apply_async(IcmpEchoScan, args=(ip,), callback=callback)
     pool.close()
+    return pool
 
 
 def TcpConnectScan(ip, port):
@@ -78,10 +86,11 @@ def ParallelPortScan(ips, ports, callback, scan_type=TcpConnectScan):
         for port in ports:
             pool.apply_async(scan_type, args=(ip, port), callback=callback)
     pool.close()
+    return pool
 
 
 if __name__ == "__main__":
-    print(ParallelIcmpEchoScan(CidrToIps("111.186.58.0/24")))
+    print(ParallelHostScan(CidrToIps("111.186.58.0/24")))
     # print(ParallelPortScan("111.186.58.123", [80, 443, 3389, 21, 22, 23, 25565]))
     # print(
     #     ParallelPortScan(
