@@ -1,4 +1,4 @@
-from scapy.all import TCP, IP, sr1, RandShort, ICMP, ARP
+from scapy.all import TCP, IP, sr1, RandShort, ICMP, ARP, UDP
 from multiprocessing.pool import ThreadPool
 import consts
 import socket
@@ -77,6 +77,26 @@ def TcpFinScan(ip, port):
             flags = response.getlayer(TCP).flags
             if "R" in flags:
                 return ip, port, consts.PORT_CLOSED
+    return ip, port, consts.PORT_OPEN | consts.PORT_FILTERED
+
+
+def UdpScan(ip, port):
+    sport = RandShort()
+    response = sr1(
+        IP(dst=ip) / UDP(sport=sport, dport=port),
+        timeout=consts.SCAN_TIMEOUT,
+        verbose=False,
+    )
+    if response:
+        if response.haslayer(UDP):
+            return ip, port, consts.PORT_OPEN
+        elif response.haslayer(ICMP):
+            icmp_type = response.getlayer(ICMP).type
+            icmp_code = response.getlayer(ICMP).code
+            if icmp_type == 3 and icmp_code == 3:
+                return ip, port, consts.PORT_CLOSED
+            else:
+                return ip, port, consts.PORT_FILTERED
     return ip, port, consts.PORT_OPEN | consts.PORT_FILTERED
 
 

@@ -102,9 +102,21 @@ def scan_ports():
             if port < 1 or port > 65535:
                 raise ValueError
             ports.append(port)
-        except ValueError:
-            messagebox.showwarning("输入错误", "请输入有效的端口范围")
-            return
+        except Exception:
+            try:
+                start, end = port.split("-")
+                start = int(start)
+                end = int(end)
+                if start < 1 or start > 65535 or end < 1 or end > 65535 or start > end:
+                    raise ValueError
+                ports.extend(range(start, end + 1))
+            except Exception:
+                messagebox.showwarning("输入错误", "请输入有效的端口范围")
+                return
+    ports = list(set(ports))
+    if len(ports) == 0:
+        messagebox.showwarning("错误", "请输入有效的端口范围")
+        return
     scan_type = scan_method.get()
     if scan_type == "TCP Connect 扫描":
         scan_function = utils.TcpConnectScan
@@ -112,6 +124,8 @@ def scan_ports():
         scan_function = utils.TcpSynScan
     elif scan_type == "TCP FIN 扫描":
         scan_function = utils.TcpFinScan
+    elif scan_type == "UDP 扫描":
+        scan_function = utils.UdpScan
     else:
         messagebox.showwarning("错误", "请选择有效的扫描方法")
         return
@@ -168,7 +182,7 @@ detect_method.current(0)
 detect_method.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
 scan_method = ttk.Combobox(settings)
-scan_method["values"] = ("TCP Connect 扫描", "TCP SYN 扫描", "TCP FIN 扫描")
+scan_method["values"] = ("TCP Connect 扫描", "TCP SYN 扫描", "TCP FIN 扫描", "UDP 扫描")
 scan_method["state"] = "readonly"
 scan_method.current(0)
 scan_method.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
