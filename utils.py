@@ -6,6 +6,23 @@ import os
 import ipaddress
 
 
+def CheckPermission():
+    if os.name == "nt":
+        import ctypes
+
+        if ctypes.windll.shell32.IsUserAnAdmin():
+            return True
+        else:
+            return False
+    elif os.name == "posix":
+        if os.getuid() == 0:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+
 def CidrToIps(cidr):
     ips = []
     try:

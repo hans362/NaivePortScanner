@@ -20,6 +20,8 @@ def detect_hosts_callback(result):
     if finished_tasks == total_tasks:
         detect_button["state"] = "normal"
         scan_button["state"] = "normal"
+        cidr_entry["state"] = "normal"
+        detect_method["state"] = "readonly"
         messagebox.showinfo("探测完成", "探测完成")
 
 
@@ -43,6 +45,8 @@ def detect_hosts():
         return
     detect_button["state"] = "disabled"
     scan_button["state"] = "disabled"
+    cidr_entry["state"] = "disabled"
+    detect_method["state"] = "disabled"
     total_tasks = len(ips)
     finished_tasks = 0
     progressbar["value"] = 0
@@ -70,22 +74,25 @@ def scan_callback(result):
             open_or_filtered = item
         elif tree.item(item)["text"] == "Closed/Filtered":
             closed_or_filtered = item
+    scan_type = scan_method.get()
     if status == consts.PORT_OPEN:
-        tree.insert(open, "end", text=f"{port}/TCP")
+        tree.insert(open, "end", text=f"{port}/{scan_type[:3]}")
         tree.item(open, open=True)
         tree.item(record, open=True)
     elif status == consts.PORT_FILTERED:
-        tree.insert(filtered, "end", text=f"{port}/TCP")
+        tree.insert(filtered, "end", text=f"{port}/{scan_type[:3]}")
     elif status == consts.PORT_CLOSED:
-        tree.insert(closed, "end", text=f"{port}/TCP")
+        tree.insert(closed, "end", text=f"{port}/{scan_type[:3]}")
     elif status == consts.PORT_OPEN | consts.PORT_FILTERED:
-        tree.insert(open_or_filtered, "end", text=f"{port}/TCP")
+        tree.insert(open_or_filtered, "end", text=f"{port}/{scan_type[:3]}")
     elif status == consts.PORT_CLOSED | consts.PORT_FILTERED:
-        tree.insert(closed_or_filtered, "end", text=f"{port}/TCP")
+        tree.insert(closed_or_filtered, "end", text=f"{port}/{scan_type[:3]}")
     progressbar["value"] = finished_tasks / total_tasks * 100
     if finished_tasks == total_tasks:
         detect_button["state"] = "normal"
         scan_button["state"] = "normal"
+        ports_entry["state"] = "normal"
+        scan_method["state"] = "readonly"
         messagebox.showinfo("扫描完成", "扫描完成")
 
 
@@ -131,6 +138,8 @@ def scan_ports():
         return
     detect_button["state"] = "disabled"
     scan_button["state"] = "disabled"
+    ports_entry["state"] = "disabled"
+    scan_method["state"] = "disabled"
     for record in tree.get_children():
         for item in tree.get_children(record):
             tree.delete(item)
@@ -200,7 +209,12 @@ progressbar.grid(row=4, column=0, columnspan=3, padx=10, pady=10, sticky="ew")
 root.grid_rowconfigure(2, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
+if not utils.CheckPermission():
+    messagebox.showerror("错误", "请以管理员权限运行本程序")
+    exit()
+
 root.mainloop()
+
 if pool:
     pool.terminate()
     pool.join()
