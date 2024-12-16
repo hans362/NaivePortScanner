@@ -18,6 +18,20 @@ def detect_hosts_callback(result):
 
 def detect_hosts():
     global total_tasks, finished_tasks, pool
+    if total_tasks - finished_tasks > 0:
+        pool.terminate()
+        pool.join()
+        while not Q.empty():
+            Q.get()
+        total_tasks = 0
+        finished_tasks = 0
+        progressbar["value"] = 0
+        detect_button["text"] = "主机探测"
+        scan_button["state"] = "normal"
+        cidr_entry["state"] = "normal"
+        detect_method["state"] = "readonly"
+        export_button["state"] = "normal"
+        return
     cidr = cidr_entry.get()
     if not cidr:
         messagebox.showwarning("错误", "请输入有效的 CIDR")
@@ -34,10 +48,11 @@ def detect_hosts():
     else:
         messagebox.showwarning("错误", "请选择有效的探测方法")
         return
-    detect_button["state"] = "disabled"
+    detect_button["text"] = "停止探测"
     scan_button["state"] = "disabled"
     cidr_entry["state"] = "disabled"
     detect_method["state"] = "disabled"
+    export_button["state"] = "disabled"
     total_tasks = len(ips)
     finished_tasks = 0
     progressbar["value"] = 0
@@ -93,6 +108,8 @@ def scan_ports():
     scan_button["state"] = "disabled"
     ports_entry["state"] = "disabled"
     scan_method["state"] = "disabled"
+    scan_timeout["state"] = "disabled"
+    export_button["state"] = "disabled"
     for record in tree.get_children():
         for item in tree.get_children(record):
             tree.delete(item)
@@ -194,13 +211,19 @@ def process_queue():
                 tree.insert("", "end", text=ip)
             progressbar["value"] = finished_tasks / total_tasks * 100
             if finished_tasks == total_tasks:
-                detect_button["state"] = "normal"
+                detect_button["text"] = "主机探测"
                 scan_button["state"] = "normal"
                 cidr_entry["state"] = "normal"
                 detect_method["state"] = "readonly"
+                export_button["state"] = "normal"
                 messagebox.showinfo("探测完成", "探测完成")
         elif result["task_type"] == "scan":
-            ip, port, status = result["result"]
+            if len(result["result"]) == 3:
+                ip, port, status = result["result"]
+                banner = None
+                title = None
+            elif len(result["result"]) == 5:
+                ip, port, status, banner, title = result["result"]
             for record in tree.get_children():
                 if tree.item(record)["text"] == ip:
                     break
@@ -219,7 +242,13 @@ def process_queue():
                     closed_or_filtered = item
             scan_type = scan_method.get()
             if status == consts.PORT_OPEN:
-                tree.insert(open, "end", text=f"{port}/{scan_type[:3]}")
+                node = tree.insert(open, "end", text=f"{port}/{scan_type[:3]}")
+                if banner:
+                    tree.insert(node, "end", text=f"[Banner] {banner}")
+                    tree.item(node, open=True)
+                if title:
+                    tree.insert(node, "end", text=f"[Title] {title}")
+                    tree.item(node, open=True)
                 tree.item(open, open=True)
                 tree.item(record, open=True)
             elif status == consts.PORT_FILTERED:
@@ -236,6 +265,8 @@ def process_queue():
                 scan_button["state"] = "normal"
                 ports_entry["state"] = "normal"
                 scan_method["state"] = "readonly"
+                scan_timeout["state"] = "normal"
+                export_button["state"] = "normal"
                 messagebox.showinfo("扫描完成", "扫描完成")
     except queue.Empty:
         pass

@@ -1,3 +1,4 @@
+import re
 from scapy.all import TCP, IP, sr1, RandShort, ICMP, ARP, UDP
 from multiprocessing.pool import ThreadPool
 import consts
@@ -76,7 +77,29 @@ def TcpConnectScan(ip, port):
     response = s.connect_ex((ip, port))
     s.close()
     if response == 0:
-        return ip, port, consts.PORT_OPEN
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(consts.SCAN_TIMEOUT / 1000)
+        s.connect_ex((ip, port))
+        try:
+            s.sendall(
+                b"GET / HTTP/1.1\r\n"
+                + f"Host: {ip}:{port}\r\n".encode("utf-8")
+                + b"Connection: close\r\n"
+                + b"\r\n\r\n"
+            )
+            banner = s.recv(1024).decode("utf-8", errors="ignore")
+            title = re.search(r"<title>(.*?)</title>", banner, re.IGNORECASE)
+            banner = banner.splitlines()[0].strip()
+            if title:
+                title = title.group(1)
+            else:
+                title = None
+        except Exception:
+            banner = None
+            title = None
+            pass
+        s.close()
+        return ip, port, consts.PORT_OPEN, banner, title
     return ip, port, consts.PORT_CLOSED | consts.PORT_FILTERED
 
 
