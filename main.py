@@ -1,6 +1,7 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox
+import queue
 
 import consts
 import utils
@@ -8,21 +9,11 @@ import utils
 total_tasks = 0
 finished_tasks = 0
 pool = None
+Q = queue.Queue()
 
 
 def detect_hosts_callback(result):
-    global total_tasks, finished_tasks
-    finished_tasks += 1
-    ip, status = result
-    if status == consts.HOST_UP:
-        tree.insert("", "end", text=ip)
-    progressbar["value"] = finished_tasks / total_tasks * 100
-    if finished_tasks == total_tasks:
-        detect_button["state"] = "normal"
-        scan_button["state"] = "normal"
-        cidr_entry["state"] = "normal"
-        detect_method["state"] = "readonly"
-        messagebox.showinfo("探测完成", "探测完成")
+    Q.put({"result": result, "task_type": "detect"})
 
 
 def detect_hosts():
@@ -55,45 +46,7 @@ def detect_hosts():
 
 
 def scan_callback(result):
-    global total_tasks, finished_tasks
-    finished_tasks += 1
-    ip, port, status = result
-    for record in tree.get_children():
-        if tree.item(record)["text"] == ip:
-            break
-    else:
-        record = tree.insert("", "end", text=ip)
-    for item in tree.get_children(record):
-        if tree.item(item)["text"] == "Open":
-            open = item
-        elif tree.item(item)["text"] == "Filtered":
-            filtered = item
-        elif tree.item(item)["text"] == "Closed":
-            closed = item
-        elif tree.item(item)["text"] == "Open/Filtered":
-            open_or_filtered = item
-        elif tree.item(item)["text"] == "Closed/Filtered":
-            closed_or_filtered = item
-    scan_type = scan_method.get()
-    if status == consts.PORT_OPEN:
-        tree.insert(open, "end", text=f"{port}/{scan_type[:3]}")
-        tree.item(open, open=True)
-        tree.item(record, open=True)
-    elif status == consts.PORT_FILTERED:
-        tree.insert(filtered, "end", text=f"{port}/{scan_type[:3]}")
-    elif status == consts.PORT_CLOSED:
-        tree.insert(closed, "end", text=f"{port}/{scan_type[:3]}")
-    elif status == consts.PORT_OPEN | consts.PORT_FILTERED:
-        tree.insert(open_or_filtered, "end", text=f"{port}/{scan_type[:3]}")
-    elif status == consts.PORT_CLOSED | consts.PORT_FILTERED:
-        tree.insert(closed_or_filtered, "end", text=f"{port}/{scan_type[:3]}")
-    progressbar["value"] = finished_tasks / total_tasks * 100
-    if finished_tasks == total_tasks:
-        detect_button["state"] = "normal"
-        scan_button["state"] = "normal"
-        ports_entry["state"] = "normal"
-        scan_method["state"] = "readonly"
-        messagebox.showinfo("扫描完成", "扫描完成")
+    Q.put({"result": result, "task_type": "scan"})
 
 
 def scan_ports():
@@ -173,7 +126,6 @@ detect_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
 scan_button = ttk.Button(root, text="端口扫描", command=scan_ports)
 scan_button.grid(row=1, column=2, padx=10, pady=10, sticky="ew")
 
-
 tree = ttk.Treeview(root)
 tree.heading("#0", text="扫描结果")
 tree.grid(row=2, column=0, columnspan=3, padx=10, pady=10, sticky="nsew")
@@ -184,24 +136,41 @@ tree.configure(yscrollcommand=vsb.set)
 settings = ttk.Frame(root)
 settings.grid(row=3, column=0, columnspan=3, padx=0, pady=0, sticky="ew")
 
-detect_method = ttk.Combobox(settings)
+detect_method_label = ttk.Labelframe(settings, text="探测方法")
+detect_method_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+detect_method_label.columnconfigure(0, weight=1)
+detect_method = ttk.Combobox(detect_method_label)
 detect_method["values"] = ("ICMP Echo 探测", "ARP 探测")
 detect_method["state"] = "readonly"
 detect_method.current(0)
 detect_method.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-scan_method = ttk.Combobox(settings)
+scan_method_label = ttk.Labelframe(settings, text="扫描方法")
+scan_method_label.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+scan_method_label.columnconfigure(0, weight=1)
+scan_method = ttk.Combobox(scan_method_label)
 scan_method["values"] = ("TCP Connect 扫描", "TCP SYN 扫描", "TCP FIN 扫描", "UDP 扫描")
 scan_method["state"] = "readonly"
 scan_method.current(0)
-scan_method.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+scan_method.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+scan_timeout_label = ttk.Labelframe(settings, text="扫描超时（毫秒）")
+scan_timeout_label.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+scan_timeout_label.columnconfigure(0, weight=1)
+scan_timeout = ttk.Entry(
+    scan_timeout_label,
+    validate="all",
+    validatecommand=(root.register(utils.ValidateTimeout), "%P"),
+)
+scan_timeout.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+scan_timeout.insert(0, consts.SCAN_TIMEOUT)
 
 export_button = ttk.Button(settings, text="导出结果")
-export_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+export_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
 settings.grid_columnconfigure(0, weight=1)
 settings.grid_columnconfigure(1, weight=1)
-
+settings.grid_columnconfigure(2, weight=1)
 
 progressbar = ttk.Progressbar(root, mode="determinate")
 progressbar.grid(row=4, column=0, columnspan=3, padx=10, pady=10, sticky="ew")
@@ -213,6 +182,67 @@ if not utils.CheckPermission():
     messagebox.showerror("错误", "请以管理员权限运行本程序")
     exit()
 
+
+def process_queue():
+    try:
+        result = Q.get_nowait()
+        global total_tasks, finished_tasks
+        finished_tasks += 1
+        if result["task_type"] == "detect":
+            ip, status = result["result"]
+            if status == consts.HOST_UP:
+                tree.insert("", "end", text=ip)
+            progressbar["value"] = finished_tasks / total_tasks * 100
+            if finished_tasks == total_tasks:
+                detect_button["state"] = "normal"
+                scan_button["state"] = "normal"
+                cidr_entry["state"] = "normal"
+                detect_method["state"] = "readonly"
+                messagebox.showinfo("探测完成", "探测完成")
+        elif result["task_type"] == "scan":
+            ip, port, status = result["result"]
+            for record in tree.get_children():
+                if tree.item(record)["text"] == ip:
+                    break
+            else:
+                record = tree.insert("", "end", text=ip)
+            for item in tree.get_children(record):
+                if tree.item(item)["text"] == "Open":
+                    open = item
+                elif tree.item(item)["text"] == "Filtered":
+                    filtered = item
+                elif tree.item(item)["text"] == "Closed":
+                    closed = item
+                elif tree.item(item)["text"] == "Open/Filtered":
+                    open_or_filtered = item
+                elif tree.item(item)["text"] == "Closed/Filtered":
+                    closed_or_filtered = item
+            scan_type = scan_method.get()
+            if status == consts.PORT_OPEN:
+                tree.insert(open, "end", text=f"{port}/{scan_type[:3]}")
+                tree.item(open, open=True)
+                tree.item(record, open=True)
+            elif status == consts.PORT_FILTERED:
+                tree.insert(filtered, "end", text=f"{port}/{scan_type[:3]}")
+            elif status == consts.PORT_CLOSED:
+                tree.insert(closed, "end", text=f"{port}/{scan_type[:3]}")
+            elif status == consts.PORT_OPEN | consts.PORT_FILTERED:
+                tree.insert(open_or_filtered, "end", text=f"{port}/{scan_type[:3]}")
+            elif status == consts.PORT_CLOSED | consts.PORT_FILTERED:
+                tree.insert(closed_or_filtered, "end", text=f"{port}/{scan_type[:3]}")
+            progressbar["value"] = finished_tasks / total_tasks * 100
+            if finished_tasks == total_tasks:
+                detect_button["state"] = "normal"
+                scan_button["state"] = "normal"
+                ports_entry["state"] = "normal"
+                scan_method["state"] = "readonly"
+                messagebox.showinfo("扫描完成", "扫描完成")
+    except queue.Empty:
+        pass
+    root.after(10, process_queue)
+
+
+root.after(10, process_queue)
 root.mainloop()
 
 if pool:

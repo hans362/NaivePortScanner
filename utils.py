@@ -33,15 +33,30 @@ def CidrToIps(cidr):
     return ips
 
 
+def ValidateTimeout(timeout):
+    if len(timeout) > 5 or not timeout.isdigit():
+        return False
+    try:
+        timeout = int(timeout)
+        if timeout < 100:
+            return False
+        consts.SCAN_TIMEOUT = timeout
+        return True
+    except Exception:
+        return False
+
+
 def IcmpEchoScan(ip):
-    response = sr1(IP(dst=ip) / ICMP(), timeout=consts.SCAN_TIMEOUT, verbose=False)
+    response = sr1(
+        IP(dst=ip) / ICMP(), timeout=consts.SCAN_TIMEOUT / 1000, verbose=False
+    )
     if response:
         return ip, consts.HOST_UP
     return ip, consts.HOST_DOWN
 
 
 def ArpScan(ip):
-    response = sr1(ARP(pdst=ip), timeout=consts.SCAN_TIMEOUT, verbose=False)
+    response = sr1(ARP(pdst=ip), timeout=consts.SCAN_TIMEOUT / 1000, verbose=False)
     if response:
         return ip, consts.HOST_UP
     return ip, consts.HOST_DOWN
@@ -50,14 +65,14 @@ def ArpScan(ip):
 def ParallelHostScan(ips, callback, scan_type=IcmpEchoScan):
     pool = ThreadPool(os.cpu_count() * 4 + 1)
     for ip in ips:
-        pool.apply_async(IcmpEchoScan, args=(ip,), callback=callback)
+        pool.apply_async(scan_type, args=(ip,), callback=callback)
     pool.close()
     return pool
 
 
 def TcpConnectScan(ip, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(consts.SCAN_TIMEOUT)
+    s.settimeout(consts.SCAN_TIMEOUT / 1000)
     response = s.connect_ex((ip, port))
     s.close()
     if response == 0:
@@ -69,7 +84,7 @@ def TcpSynScan(ip, port):
     sport = RandShort()
     response = sr1(
         IP(dst=ip) / TCP(sport=sport, dport=port, flags="S"),
-        timeout=consts.SCAN_TIMEOUT,
+        timeout=consts.SCAN_TIMEOUT / 1000,
         verbose=False,
     )
     if response:
@@ -86,7 +101,7 @@ def TcpFinScan(ip, port):
     sport = RandShort()
     response = sr1(
         IP(dst=ip) / TCP(sport=sport, dport=port, flags="F"),
-        timeout=consts.SCAN_TIMEOUT,
+        timeout=consts.SCAN_TIMEOUT / 1000,
         verbose=False,
     )
     if response:
@@ -101,7 +116,7 @@ def UdpScan(ip, port):
     sport = RandShort()
     response = sr1(
         IP(dst=ip) / UDP(sport=sport, dport=port),
-        timeout=consts.SCAN_TIMEOUT,
+        timeout=consts.SCAN_TIMEOUT / 1000,
         verbose=False,
     )
     if response:
