@@ -1,3 +1,4 @@
 scapy
 ttkbootstrap
 openpyxl
+pyinstaller
