@@ -128,11 +128,13 @@ def scan_ports():
     for record in tree.get_children():
         for item in tree.get_children(record):
             tree.delete(item)
+        tree.item(record, open=False)
         tree.insert(record, "end", text="Open")
         tree.insert(record, "end", text="Filtered")
         tree.insert(record, "end", text="Closed")
         tree.insert(record, "end", text="Open/Filtered")
         tree.insert(record, "end", text="Closed/Filtered")
+        root.update()
     total_tasks = len(ips) * len(ports)
     finished_tasks = 0
     progressbar["value"] = 0
