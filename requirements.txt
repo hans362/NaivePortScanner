@@ -1,4 +1,3 @@
 scapy
 ttkbootstrap
-pandas
 openpyxl

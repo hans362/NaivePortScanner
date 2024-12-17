@@ -141,6 +141,18 @@ def scan_ports():
     pool = utils.ParallelPortScan(ips, ports, scan_callback, scan_function)
 
 
+def export_results():
+    detect_button["state"] = "disabled"
+    scan_button["state"] = "disabled"
+    export_button["state"] = "disabled"
+    root.update()
+    filename = utils.SaveResults(tree)
+    detect_button["state"] = "normal"
+    scan_button["state"] = "normal"
+    export_button["state"] = "normal"
+    messagebox.showinfo("导出完成", "已导出结果到 " + filename)
+
+
 root = ttk.Window(themename="superhero")
 root.title("NaivePortScanner")
 root.geometry("1024x768")
@@ -199,7 +211,7 @@ scan_timeout = ttk.Entry(
 scan_timeout.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 scan_timeout.insert(0, consts.SCAN_TIMEOUT)
 
-export_button = ttk.Button(settings, text="导出结果")
+export_button = ttk.Button(settings, text="导出结果", command=export_results)
 export_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
 settings.grid_columnconfigure(0, weight=1)

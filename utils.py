@@ -1,6 +1,8 @@
 import re
 from scapy.all import TCP, IP, sr1, RandShort, ICMP, ARP, UDP
 from multiprocessing.pool import ThreadPool
+from datetime import datetime
+from openpyxl import Workbook
 import consts
 import socket
 import os
@@ -162,6 +164,44 @@ def ParallelPortScan(ips, ports, callback, scan_type=TcpConnectScan):
             pool.apply_async(scan_type, args=(ip, port), callback=callback)
     pool.close()
     return pool
+
+
+def SaveResults(tree):
+    filename = f"results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["主机IP地址", "传输层协议", "端口号", "状态", "额外信息"])
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 20
+    ws.column_dimensions["C"].width = 20
+    ws.column_dimensions["D"].width = 20
+    ws.column_dimensions["E"].width = 100
+    hosts = tree.get_children()
+    for host in hosts:
+        host_ip = tree.item(host)["text"]
+        results = tree.get_children(host)
+        for result in results:
+            result_name = tree.item(result)["text"]
+            ports = tree.get_children(result)
+            for port in ports:
+                port_number = tree.item(port)["text"]
+                extra_info = " ".join(
+                    [
+                        str(tree.item(x)["text"].encode())[2:-1]
+                        for x in tree.get_children(port)
+                    ]
+                )
+                ws.append(
+                    [
+                        host_ip,
+                        port_number.split("/")[1],
+                        port_number.split("/")[0],
+                        result_name,
+                        extra_info,
+                    ]
+                )
+    wb.save(filename)
+    return filename
 
 
 if __name__ == "__main__":
