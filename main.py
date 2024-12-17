@@ -2,6 +2,7 @@ import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox
 import queue
+import sys
 
 import consts
 import utils
@@ -125,6 +126,7 @@ def scan_ports():
     scan_method["state"] = "disabled"
     scan_timeout["state"] = "disabled"
     export_button["state"] = "disabled"
+    progressbar["value"] = 0
     for record in tree.get_children():
         for item in tree.get_children(record):
             tree.delete(item)
@@ -137,7 +139,6 @@ def scan_ports():
         root.update()
     total_tasks = len(ips) * len(ports)
     finished_tasks = 0
-    progressbar["value"] = 0
     pool = utils.ParallelPortScan(ips, ports, scan_callback, scan_function)
 
 
@@ -226,7 +227,7 @@ root.grid_columnconfigure(1, weight=1)
 
 if not utils.CheckPermission():
     messagebox.showerror("错误", "请以管理员权限运行本程序")
-    exit()
+    sys.exit()
 
 
 def process_queue():
