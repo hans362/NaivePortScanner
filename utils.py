@@ -2,7 +2,7 @@ import re
 from scapy.all import TCP, IP, sr1, RandShort, ICMP, ARP, UDP
 from multiprocessing.pool import ThreadPool
 from datetime import datetime
-from openpyxl import Workbook
+from openpyxl import Workbook, styles
 import consts
 import socket
 import os
@@ -185,21 +185,46 @@ def SaveResults(tree):
             ports = tree.get_children(result)
             for port in ports:
                 port_number = tree.item(port)["text"]
-                extra_info = " ".join(
-                    [
-                        str(tree.item(x)["text"].encode())[2:-1]
-                        for x in tree.get_children(port)
-                    ]
-                )
-                ws.append(
-                    [
-                        host_ip,
-                        port_number.split("/")[1],
-                        port_number.split("/")[0],
-                        result_name,
-                        extra_info,
-                    ]
-                )
+                try:
+                    extra_info = " ".join(
+                        [tree.item(x)["text"] for x in tree.get_children(port)]
+                    )
+                    ws.append(
+                        [
+                            host_ip,
+                            port_number.split("/")[1],
+                            port_number.split("/")[0],
+                            result_name,
+                            extra_info,
+                        ]
+                    )
+                except Exception:
+                    extra_info = " ".join(
+                        [
+                            str(tree.item(x)["text"].encode())[2:-1]
+                            for x in tree.get_children(port)
+                        ]
+                    )
+                    ws.append(
+                        [
+                            host_ip,
+                            port_number.split("/")[1],
+                            port_number.split("/")[0],
+                            result_name,
+                            extra_info,
+                        ]
+                    )
+    ws.auto_filter.ref = ws.dimensions
+    for row in ws.iter_rows(
+        min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column
+    ):
+        for cell in row:
+            cell.border = cell.border + styles.Border(
+                left=styles.Side(style="thin", color="000000"),
+                right=styles.Side(style="thin", color="000000"),
+                top=styles.Side(style="thin", color="000000"),
+                bottom=styles.Side(style="thin", color="000000"),
+            )
     wb.save(filename)
     return filename
 
