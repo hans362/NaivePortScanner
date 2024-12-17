@@ -25,7 +25,7 @@ def detect_hosts():
             Q.get()
         total_tasks = 0
         finished_tasks = 0
-        progressbar["value"] = 0
+        progressbar["value"] = 100
         detect_button["text"] = "主机探测"
         scan_button["state"] = "normal"
         cidr_entry["state"] = "normal"
@@ -66,6 +66,21 @@ def scan_callback(result):
 
 def scan_ports():
     global total_tasks, finished_tasks, pool
+    if total_tasks - finished_tasks > 0:
+        pool.terminate()
+        pool.join()
+        while not Q.empty():
+            Q.get()
+        total_tasks = 0
+        finished_tasks = 0
+        progressbar["value"] = 100
+        detect_button["state"] = "normal"
+        scan_button["text"] = "端口扫描"
+        ports_entry["state"] = "normal"
+        scan_method["state"] = "readonly"
+        scan_timeout["state"] = "normal"
+        export_button["state"] = "normal"
+        return
     ips = [tree.item(record)["text"] for record in tree.get_children()]
     if len(ips) == 0:
         messagebox.showwarning("错误", "请先进行主机探测")
@@ -105,7 +120,7 @@ def scan_ports():
         messagebox.showwarning("错误", "请选择有效的扫描方法")
         return
     detect_button["state"] = "disabled"
-    scan_button["state"] = "disabled"
+    scan_button["text"] = "停止扫描"
     ports_entry["state"] = "disabled"
     scan_method["state"] = "disabled"
     scan_timeout["state"] = "disabled"
@@ -216,6 +231,7 @@ def process_queue():
                 cidr_entry["state"] = "normal"
                 detect_method["state"] = "readonly"
                 export_button["state"] = "normal"
+                root.update()
                 messagebox.showinfo("探测完成", "探测完成")
         elif result["task_type"] == "scan":
             if len(result["result"]) == 3:
@@ -262,11 +278,12 @@ def process_queue():
             progressbar["value"] = finished_tasks / total_tasks * 100
             if finished_tasks == total_tasks:
                 detect_button["state"] = "normal"
-                scan_button["state"] = "normal"
+                scan_button["text"] = "端口扫描"
                 ports_entry["state"] = "normal"
                 scan_method["state"] = "readonly"
                 scan_timeout["state"] = "normal"
                 export_button["state"] = "normal"
+                root.update()
                 messagebox.showinfo("扫描完成", "扫描完成")
     except queue.Empty:
         pass
