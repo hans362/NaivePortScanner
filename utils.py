@@ -230,15 +230,4 @@ def SaveResults(tree):
 
 
 if __name__ == "__main__":
-    print(ParallelHostScan(CidrToIps("111.186.58.0/24")))
-    # print(ParallelPortScan("111.186.58.123", [80, 443, 3389, 21, 22, 23, 25565]))
-    # print(
-    #     ParallelPortScan(
-    #         "111.186.58.123", [80, 443, 3389, 21, 22, 23, 25565], TcpSynScan
-    #     )
-    # )
-    # print(
-    #     ParallelPortScan(
-    #         "111.186.58.123", [80, 443, 3389, 21, 22, 23, 25565], TcpFinScan
-    #     )
-    # )
+    pass
